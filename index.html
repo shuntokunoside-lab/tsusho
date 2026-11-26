@@ -171,7 +171,7 @@ async function init() {
     const box = $('months');
     r.months.forEach((m) => {
       const b = el('button', '', m.label);
-      if (m.locked) b.appendChild(el('span', 'lk', '締切済'));
+      if (m.ym === r.months[0].ym && r.months.length === 3) b.appendChild(el('span', 'lk', '変更のみ'));
       b.dataset.ym = m.ym;
       b.onclick = () => { if (dirty && !confirmLeave()) return; loadMonth(m.ym); };
       box.appendChild(b);
@@ -228,7 +228,7 @@ function resetToUsual() {
     return;
   }
   resetToUsual.armed = false;
-  state.plan.forEach((p) => (vals[p.d] = { v: p.def, memo: '', go: '', back: '' }));
+  state.plan.forEach((p) => { if (p.d >= state.editFrom) vals[p.d] = { v: p.def, memo: '', go: '', back: '' }; });
   dirty = true; renderDays(); toast('いつもの予定に戻しました');
 }
 
@@ -238,12 +238,18 @@ function render() {
 
   renderDue();
   const last = state.submittedAt ? '最終提出：' + state.submittedAt + (state.submitCount > 1 ? '（' + state.submitCount + '回目）' : '') : '';
+  const tel = state.phone ? '（' + state.phone + '）' : '';
   if (locked) {
-    main.appendChild(el('div', 'note warn', state.label + '分の提出期限（' + state.deadline + '）を過ぎました。' + (last ? '\n' + last + '\n' : '') + '変更があるときは、お手数ですが施設までお電話ください' + (state.phone ? '（' + state.phone + '）' : '') + '。'));
+    main.appendChild(el('div', 'note warn', state.label + '分は、この画面では変更できません。' + (last ? '\n' + last + '\n' : '') + '変更があるときは、お手数ですが施設までお電話ください' + tel + '。'));
   } else if (state.submittedAt) {
-    main.appendChild(el('div', 'note ok', '提出ありがとうございました。\n' + last + '\n予定が変わったときは、' + state.deadline + ' までなら何度でも直して再提出できます。'));
+    main.appendChild(el('div', 'note ok', '提出ありがとうございました。\n' + last + '\n予定が変わったら、すぐにご連絡ください。この画面で直して「再提出する」を押していただくと、施設に伝わります。'));
+  } else if (state.pastDeadline) {
+    main.appendChild(el('div', 'note warn', state.label + '分の提出期限（' + state.deadline + '）を過ぎています。お早めにご提出ください。'));
   } else {
     main.appendChild(el('div', 'note warn', state.label + '分のご予定を、' + state.deadline + ' までにご提出ください。'));
+  }
+  if (!locked && state.editFrom > 1) {
+    main.appendChild(el('div', 'note warn', '今日までの日は、この画面では変更できません。当日の急な変更は、お電話でご連絡ください' + tel + '。'));
   }
   main.lastChild.style.whiteSpace = 'pre-line';
 
@@ -262,7 +268,7 @@ function render() {
      '送迎は、最初は「往復送迎あり」です。送迎がいらない日は、🚐の行を押して「行き」「帰り」ごとに選び、時間と方法を書いてください。',
      '通院・ショートステイなどは「メモ」に書いてください。',
      '変更がなければ、そのまま「提出する」を押してください。',
-     state.submittedAt ? '提出したあとで予定が変わったら、直して「再提出する」を押してください。' : null]
+     '予定が変わったら、すぐにご連絡ください（この画面で直して「再提出する」を押してください）。']
       .filter(Boolean).forEach((t) => how.appendChild(el('li', '', t)));
     info.appendChild(how);
   }
@@ -299,7 +305,12 @@ const submitText = () => (state.submittedAt ? '再提出する' : '提出する'
 function renderDue() {
   const d = $('due');
   d.hidden = false;
-  if (state.locked) { d.className = 'due lock'; d.textContent = '提出期限 ' + state.deadline + '（締切済み）'; return; }
+  if (state.locked) { d.className = 'due lock'; d.textContent = '変更はお電話で'; return; }
+  if (state.pastDeadline) {
+    d.className = 'due' + (state.submittedAt ? ' ok' : '');
+    d.textContent = state.submittedAt ? '提出済み・変更があればすぐにご連絡ください' : '提出期限 ' + state.deadline + ' を過ぎています';
+    return;
+  }
   const left = state.daysLeft <= 0 ? '今日まで' : 'あと' + state.daysLeft + '日';
   d.className = 'due' + (state.submittedAt ? ' ok' : '');
   d.textContent = '提出期限 ' + state.deadline + ' まで（' + left + '）' + (state.submittedAt ? '・提出済み' : '');
@@ -313,8 +324,8 @@ function isChanged(p) {
 
 function renderDays() {
   const list = $('days'); list.innerHTML = '';
-  const locked = state.locked;
   state.plan.forEach((p) => {
+    const locked = state.locked || p.d < state.editFrom; // 過ぎた日・今日は変えられない
     const v = vals[p.d] || { v: '', memo: '' };
     const hol = isHol(p.d);
     const row = el('div', 'day w' + (hol ? 0 : p.dow));

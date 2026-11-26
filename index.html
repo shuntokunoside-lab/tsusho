@@ -72,6 +72,18 @@
   .memo { grid-column: 1 / 4; }
   input[type=text], textarea { width: 100%; font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-family: inherit; }
   textarea { min-height: 84px; resize: vertical; }
+  .ride { grid-column: 1 / 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); }
+  .ride .rbtn { border: 1px dashed var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 14px; color: var(--sub); }
+  .ride .rbtn.has { border-style: solid; border-color: #b39ddb; color: #5e35b1; background: #f3effa; font-weight: 600; }
+  .rpanel { grid-column: 1 / 4; background: #faf8fd; border: 1px solid #e3dcf2; border-radius: 10px; padding: 8px 10px; }
+  .rline { display: grid; grid-template-columns: 52px 1fr; gap: 6px; align-items: center; margin: 4px 0; }
+  .rline .lb { font-weight: 700; font-size: 14px; }
+  .rline .rx { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rline .seg button { padding: 6px 10px; min-width: 0; font-size: 14px; }
+  .seg button.on.ride-on { background: var(--accent); color: #fff; }
+  .seg button.on.ride-off { background: #7e57c2; color: #fff; }
+  .rline select { padding: 6px 8px; font-size: 15px; }
+  .rline input[type=text] { flex: 1 1 100%; font-size: 15px; padding: 6px 8px; }
   footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
   footer .count { font-size: 14px; color: var(--sub); line-height: 1.35; }
@@ -190,6 +202,23 @@ async function loadMonth(ym) {
 }
 
 const planOf = (d) => state.plan.find((p) => p.d === d);
+// その日の値を一部だけ書きかえる（送迎の情報などを消さないように）
+const upd = (d, patch) => (vals[d] = Object.assign({ v: '', memo: '', go: '', back: '' }, vals[d] || {}, patch));
+
+/* 送迎：'' = 送迎あり、'なし|10:00|家族が送ります' = 送迎なし（時間・方法） */
+const RIDE_TIMES = (() => { const a = []; for (let m = 8 * 60; m <= 18 * 60; m += 15) a.push(Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0')); return a; })();
+function parseRide(s) {
+  const m = String(s || '').match(/^なし\|([^|]*)\|(.*)$/);
+  return m ? { off: true, t: m[1], how: m[2] } : { off: false, t: '', how: '' };
+}
+const rideStr = (r) => (r.off ? 'なし|' + (r.t || '') + '|' + (r.how || '').replace(/\|/g, '／') : '');
+function rideSummary(v) {
+  const g = parseRide(v.go), b = parseRide(v.back);
+  if (!g.off && !b.off) return '往復送迎あり';
+  const part = (lb, r, verb) => lb + (r.off ? '：送迎なし' + (r.t ? '（' + r.t + verb + '）' : '') : '：送迎あり');
+  return part('行き', g, 'に着') + '／' + part('帰り', b, 'にお迎え');
+}
+const isUseDay = (p, v) => (p.type === 'toggle' && v.v === '利用') || (p.type === 'hope' && !!v.v);
 const isHol = (d) => !!(state.holidays && state.holidays[String(d)]);
 
 function resetToUsual() {
@@ -199,7 +228,7 @@ function resetToUsual() {
     return;
   }
   resetToUsual.armed = false;
-  state.plan.forEach((p) => (vals[p.d] = { v: p.def, memo: '' }));
+  state.plan.forEach((p) => (vals[p.d] = { v: p.def, memo: '', go: '', back: '' }));
   dirty = true; renderDays(); toast('いつもの予定に戻しました');
 }
 
@@ -229,7 +258,8 @@ function render() {
     ['いつもの日には、最初から「利用」が入っています。',
      'お休みの日は「休み」、いつもは無い日に来たいときは「利用」を押してください。',
      state.plan.some((p) => p.type === 'hope') ? '土曜日は、利用したい日に「第1希望」「第2希望」…を選んでください。' : null,
-     '時間の変更や通院・ショートステイなどは「メモ」に書いてください。',
+     '送迎は、最初は「往復送迎あり」です。送迎がいらない日は、🚐の行を押して「行き」「帰り」ごとに選び、時間と方法を書いてください。',
+     '通院・ショートステイなどは「メモ」に書いてください。',
      '変更がなければ、そのまま「提出する」を押してください。',
      state.submittedAt ? '提出したあとで予定が変わったら、直して「再提出する」を押してください。' : null]
       .filter(Boolean).forEach((t) => how.appendChild(el('li', '', t)));
@@ -277,7 +307,7 @@ function renderDue() {
 function isChanged(p) {
   const v = vals[p.d] || {};
   if (p.type === 'closed' || p.type === 'satNone') return false;
-  return (v.v || '') !== (p.def || '') || !!v.memo;
+  return (v.v || '') !== (p.def || '') || !!v.memo || !!v.go || !!v.back;
 }
 
 function renderDays() {
@@ -311,7 +341,7 @@ function renderDays() {
       s.onchange = () => {
         // 同じ順位がほかの土曜にあれば外す
         if (s.value) state.plan.forEach((q) => { if (q.d !== p.d && vals[q.d] && vals[q.d].v === s.value) vals[q.d].v = ''; });
-        vals[p.d] = { v: s.value, memo: (vals[p.d] || {}).memo || '' };
+        upd(p.d, { v: s.value });
         dirty = true; renderDays();
       };
       mid.appendChild(s);
@@ -322,7 +352,7 @@ function renderDays() {
       bu.classList.toggle('on', v.v === '利用');
       bo.classList.toggle('on', v.v !== '利用');
       bu.disabled = bo.disabled = locked;
-      const set = (x) => { vals[p.d] = { v: x, memo: (vals[p.d] || {}).memo || '' }; dirty = true; renderDays(); };
+      const set = (x) => { upd(p.d, { v: x }); dirty = true; renderDays(); };
       bu.onclick = () => set('利用');
       bo.onclick = () => set('休み');
       seg.append(bu, bo);
@@ -343,16 +373,64 @@ function renderDays() {
     inp.placeholder = '例：通院のため11時ごろ通所／ショートステイ明け';
     inp.value = v.memo || ''; inp.disabled = locked;
     inp.oninput = () => {
-      vals[p.d] = { v: (vals[p.d] || {}).v || '', memo: inp.value }; dirty = true;
+      upd(p.d, { memo: inp.value }); dirty = true;
       mb.classList.toggle('has', !!inp.value); mb.textContent = inp.value ? 'メモ✓' : 'メモ';
       row.classList.toggle('changed', isChanged(p)); updateCount();
     };
     box.appendChild(inp); row.appendChild(box);
     mb.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) inp.focus(); };
+    if (isUseDay(p, v)) addRide(row, p, locked);
     list.appendChild(row);
   });
   updateCount();
 }
+
+/** 利用する日の下に「送迎」の行。押すと行き・帰りを選べる */
+function addRide(row, p, locked) {
+  const v = vals[p.d];
+  const changed = !!(v.go || v.back);
+  const line = el('div', 'ride');
+  line.append('🚐 ');
+  const btn = el('button', 'rbtn' + (changed ? ' has' : ''), rideSummary(v) + (locked ? '' : '　▸変更'));
+  btn.disabled = locked;
+  line.appendChild(btn);
+  row.appendChild(line);
+  const panel = el('div', 'rpanel');
+  panel.hidden = !rideOpen[p.d];
+  btn.onclick = () => { rideOpen[p.d] = !rideOpen[p.d]; panel.hidden = !rideOpen[p.d]; };
+
+  const mk = (key, label, offLabel, verb, ph) => {
+    const r = parseRide(v[key]);
+    const ln = el('div', 'rline');
+    ln.appendChild(el('span', 'lb', label));
+    const rx = el('div', 'rx');
+    const seg = el('span', 'seg');
+    const on = el('button', 'ride-on', '送迎あり');
+    const off = el('button', 'ride-off', offLabel);
+    on.classList.toggle('on', !r.off); off.classList.toggle('on', r.off);
+    const save = (nr) => { upd(p.d, { [key]: rideStr(nr) }); dirty = true; rideOpen[p.d] = true; renderDays(); };
+    on.onclick = () => save({ off: false });
+    off.onclick = () => save({ off: true, t: r.t, how: r.how });
+    seg.append(on, off);
+    rx.appendChild(seg);
+    if (r.off) {
+      const sel = el('select');
+      sel.appendChild(new Option('時間（未定）', ''));
+      RIDE_TIMES.forEach((t) => sel.appendChild(new Option(t + verb, t)));
+      sel.value = r.t || '';
+      sel.onchange = () => { upd(p.d, { [key]: rideStr({ off: true, t: sel.value, how: parseRide(vals[p.d][key]).how }) }); dirty = true; btn.textContent = rideSummary(vals[p.d]) + '　▸変更'; updateCount(); };
+      const how = document.createElement('input'); how.type = 'text'; how.maxLength = 40; how.placeholder = ph; how.value = r.how || '';
+      how.oninput = () => { upd(p.d, { [key]: rideStr({ off: true, t: parseRide(vals[p.d][key]).t, how: how.value }) }); dirty = true; updateCount(); };
+      rx.append(sel, how);
+    }
+    ln.appendChild(rx);
+    return ln;
+  };
+  panel.appendChild(mk('go', '行き', '送迎なし', 'に着く', '例：家族が送ります／ショートステイ先から'));
+  panel.appendChild(mk('back', '帰り', '送迎なし', 'にお迎え', '例：家族が迎えに行きます／病院へ直行'));
+  row.appendChild(panel);
+}
+const rideOpen = {};
 
 function updateCount() {
   const use = state.plan.filter((p) => vals[p.d] && vals[p.d].v === '利用').length;

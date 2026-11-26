@@ -171,7 +171,7 @@ async function init() {
     const box = $('months');
     r.months.forEach((m) => {
       const b = el('button', '', m.label);
-      if (m.ym === r.months[0].ym && r.months.length === 3) b.appendChild(el('span', 'lk', '変更のみ'));
+      if (m.change) b.appendChild(el('span', 'lk', '変更のみ'));
       b.dataset.ym = m.ym;
       b.onclick = () => { if (dirty && !confirmLeave()) return; loadMonth(m.ym); };
       box.appendChild(b);

@@ -19,6 +19,11 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
   h1 { font-size: 17px; margin: 0; }
   .who { color: var(--sub); font-size: 14px; }
+  .due { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 700;
+    background: var(--warn-soft); color: var(--warn); }
+  .due.ok { background: var(--accent-soft); color: var(--accent); }
+  .due.lock { background: #eceff1; color: var(--sub); }
+  .due[hidden] { display: none; }
   .months { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; }
   .months button { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px;
     padding: 6px 14px; font-size: 15px; color: var(--ink); }
@@ -83,6 +88,7 @@
 <header>
   <h1 id="title">通所予定のご提出</h1>
   <div class="who" id="who">読み込み中…</div>
+  <div class="due" id="due" hidden></div>
   <div class="months" id="months"></div>
 </header>
 
@@ -201,9 +207,16 @@ function render() {
   const main = $('main'); main.innerHTML = '';
   const locked = state.locked;
 
-  if (locked) main.appendChild(el('div', 'note warn', state.label + '分は締切（' + state.deadline + '）を過ぎました。変更があるときは、お手数ですが施設までお電話ください' + (state.phone ? '（' + state.phone + '）' : '') + '。'));
-  else if (state.submittedAt) main.appendChild(el('div', 'note ok', '提出ありがとうございました（' + state.submittedAt + '）。締切の ' + state.deadline + ' までは何度でも直せます。'));
-  else main.appendChild(el('div', 'note ok', state.label + '分のご予定を、' + state.deadline + ' までにご提出ください。'));
+  renderDue();
+  const last = state.submittedAt ? '最終提出：' + state.submittedAt + (state.submitCount > 1 ? '（' + state.submitCount + '回目）' : '') : '';
+  if (locked) {
+    main.appendChild(el('div', 'note warn', state.label + '分の提出期限（' + state.deadline + '）を過ぎました。' + (last ? '\n' + last + '\n' : '') + '変更があるときは、お手数ですが施設までお電話ください' + (state.phone ? '（' + state.phone + '）' : '') + '。'));
+  } else if (state.submittedAt) {
+    main.appendChild(el('div', 'note ok', '提出ありがとうございました。\n' + last + '\n予定が変わったときは、' + state.deadline + ' までなら何度でも直して再提出できます。'));
+  } else {
+    main.appendChild(el('div', 'note warn', state.label + '分のご予定を、' + state.deadline + ' までにご提出ください。'));
+  }
+  main.lastChild.style.whiteSpace = 'pre-line';
 
   const info = el('div', 'card');
   info.appendChild(el('h2', '', 'いつものご利用'));
@@ -217,7 +230,8 @@ function render() {
      'お休みの日は「休み」、いつもは無い日に来たいときは「利用」を押してください。',
      state.plan.some((p) => p.type === 'hope') ? '土曜日は、利用したい日に「第1希望」「第2希望」…を選んでください。' : null,
      '時間の変更や通院・ショートステイなどは「メモ」に書いてください。',
-     '変更がなければ、そのまま「提出する」を押してください。']
+     '変更がなければ、そのまま「提出する」を押してください。',
+     state.submittedAt ? '提出したあとで予定が変わったら、直して「再提出する」を押してください。' : null]
       .filter(Boolean).forEach((t) => how.appendChild(el('li', '', t)));
     info.appendChild(how);
   }
@@ -245,7 +259,19 @@ function render() {
 
   renderDays();
   $('submit').disabled = locked;
-  $('submit').textContent = state.submittedAt ? '直して提出' : '提出する';
+  $('submit').textContent = submitText();
+}
+
+const submitText = () => (state.submittedAt ? '再提出する' : '提出する');
+
+/** 上の「提出期限」の表示 */
+function renderDue() {
+  const d = $('due');
+  d.hidden = false;
+  if (state.locked) { d.className = 'due lock'; d.textContent = '提出期限 ' + state.deadline + '（締切済み）'; return; }
+  const left = state.daysLeft <= 0 ? '今日まで' : 'あと' + state.daysLeft + '日';
+  d.className = 'due' + (state.submittedAt ? ' ok' : '');
+  d.textContent = '提出期限 ' + state.deadline + ' まで（' + left + '）' + (state.submittedAt ? '・提出済み' : '');
 }
 
 function isChanged(p) {
@@ -353,11 +379,11 @@ $('submit').onclick = async () => {
   $('submit').disabled = true; $('submit').textContent = '送信中…';
   try {
     const r = await call('save', { ym: state.ym, payload: { days: vals, note: note } });
-    state.submittedAt = r.submittedAt; state.note = note; dirty = false;
-    render(); window.scrollTo(0, 0); toast('提出しました。ありがとうございました');
+    state.submittedAt = r.submittedAt; state.submitCount = r.submitCount; state.note = note; dirty = false;
+    render(); window.scrollTo(0, 0); toast(r.submitCount > 1 ? '再提出しました（' + r.submitCount + '回目）' : '提出しました。ありがとうございました');
   } catch (err) {
     toast(err.message || '送信に失敗しました。電波の良いところでもう一度お試しください');
-    $('submit').disabled = false; $('submit').textContent = state.submittedAt ? '直して提出' : '提出する';
+    $('submit').disabled = false; $('submit').textContent = submitText();
   }
 };
 

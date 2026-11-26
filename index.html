@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>通所予定のご提出</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --ink: #1f2933; --sub: #5f6b7a; --line: #e0e4e9;
+    --accent: #2e7d5b; --accent-soft: #e6f2ec; --warn: #a14a00; --warn-soft: #fdf3e3;
+    --sun: #c62828; --sat: #1565c0; --off: #8a939e; --add: #1565c0; --add-soft: #e3f2fd; --hope: #8a5a00; --hope-soft: #fff3cd;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
+  h1 { font-size: 17px; margin: 0; }
+  .who { color: var(--sub); font-size: 14px; }
+  .months { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; }
+  .months button { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    padding: 6px 14px; font-size: 15px; color: var(--ink); }
+  .months button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .months button .lk { font-size: 11px; opacity: .8; margin-left: 4px; }
+  main { padding: 12px 16px calc(100px + env(safe-area-inset-bottom, 0px)); max-width: 640px; margin: 0 auto; }
+  .note { border-radius: 10px; padding: 10px 12px; font-size: 15px; margin-bottom: 12px; }
+  .note.ok { background: var(--accent-soft); }
+  .note.warn { background: var(--warn-soft); color: var(--warn); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 15px; margin: 0 0 6px; }
+  .card p { margin: 4px 0; font-size: 15px; }
+  .usual { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 15px; }
+  .usual b { font-weight: 700; }
+  .how { font-size: 14px; color: var(--sub); margin: 6px 0 0; padding-left: 1.2em; }
+  .how li { margin: 2px 0; }
+  .tools { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 14px; font-size: 16px; font-weight: 600;
+    background: var(--accent); color: #fff; }
+  .btn.sub { background: #fff; color: var(--ink); border: 1px solid var(--line); font-weight: 500; font-size: 14px; padding: 8px 12px; }
+  .btn:disabled { opacity: .5; }
+  .days { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .day { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; align-items: center;
+    padding: 8px 10px; border-top: 1px solid var(--line); }
+  .day:first-child { border-top: 0; }
+  .day.w0 .dl { color: var(--sun); } .day.w6 .dl { color: var(--sat); }
+  .day.closed { background: #f3f4f6; color: var(--off); }
+  .day.closed .dl { color: var(--off); }
+  .day.changed { background: #fffbea; }
+  .dl { font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .dl small { font-weight: 400; font-size: 13px; }
+  .dl .tag { display: block; font-size: 11px; font-weight: 400; color: var(--sub); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { border: 0; background: #fff; padding: 8px 14px; font-size: 15px; color: var(--ink); min-width: 64px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on.use { background: var(--accent); color: #fff; }
+  .seg button.on.add { background: var(--add); color: #fff; }
+  .seg button.on.off { background: #6b7480; color: #fff; }
+  .seg button:disabled { opacity: .6; }
+  select { font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); max-width: 100%; }
+  select.has { background: var(--hope-soft); border-color: #e6c66a; color: var(--hope); font-weight: 600; }
+  .closed-txt { font-size: 14px; }
+  .chg { font-size: 12px; color: var(--warn); margin-left: 6px; white-space: nowrap; }
+  .memo-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 10px; font-size: 14px; color: var(--sub); }
+  .memo-btn.has { color: var(--accent); border-color: var(--accent); }
+  .memo { grid-column: 1 / 4; }
+  input[type=text], textarea { width: 100%; font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-family: inherit; }
+  textarea { min-height: 84px; resize: vertical; }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  footer .count { font-size: 14px; color: var(--sub); line-height: 1.35; }
+  footer .btn { flex: none; min-width: 150px; padding: 12px 16px; }
+  .loading { text-align: center; color: var(--sub); padding: 40px 0; }
+  .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #222; color: #fff;
+    padding: 10px 16px; border-radius: 10px; font-size: 15px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
+  .toast.show { opacity: 1; }
+  .done { text-align: center; padding: 24px 12px; }
+  .done .big { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">通所予定のご提出</h1>
+  <div class="who" id="who">読み込み中…</div>
+  <div class="months" id="months"></div>
+</header>
+
+<main id="main"><div class="loading">読み込み中…</div></main>
+
+<footer>
+  <span class="count" id="count"></span>
+  <button class="btn" id="submit" disabled>提出する</button>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+// データの送り先（Apps Scriptのウェブアプリ）。ログイン情報は付けずに通信する
+const API_URL = 'https://script.google.com/macros/s/AKfycbyuacGQWf0fh0z9SIO1rECvI6jF8_6KpIBnCe91NtJUAIvlFQtdicjZZhSbXqNpeg/exec';
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const MAX_HOPE = 5;
+let state = null;   // apiGetMonth の結果
+let vals = {};      // { 日: {v, memo} }
+let note = '';
+let dirty = false;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const DOW = ['日','月','火','水','木','金','土'];
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function request(url, opts) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      const res = await fetch(url, Object.assign({ credentials: 'omit', redirect: 'follow', cache: 'no-store' }, opts));
+      const j = await res.json();
+      if (!j.ok) throw Object.assign(new Error(j.error || 'エラーが起きました'), { fromServer: true });
+      return j.data;
+    } catch (err) {
+      if (err.fromServer) throw err;
+      await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+  throw new Error('通信できませんでした。電波の良いところで、もう一度お試しください。');
+}
+
+function call(api, params) {
+  if (!TOKEN) return Promise.reject(new Error('このURLは使えません。施設からお渡ししたQRコード、または専用のURLから開いてください。'));
+  if (api === 'save') return request(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ api: 'save', t: TOKEN }, params)),
+  });
+  const q = Object.assign({ api: api, t: TOKEN }, params);
+  return request(API_URL + '?' + Object.keys(q).map((k) => k + '=' + encodeURIComponent(q[k])).join('&'));
+}
+
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+function showError(err) {
+  $('main').innerHTML = '';
+  $('main').appendChild(el('div', 'note warn', err.message || '読み込みに失敗しました。'));
+}
+
+async function init() {
+  try {
+    const r = await call('months', {});
+    $('who').textContent = r.name + ' 様' + (r.office ? '（' + r.office + '）' : '');
+    const box = $('months');
+    r.months.forEach((m) => {
+      const b = el('button', '', m.label);
+      if (m.locked) b.appendChild(el('span', 'lk', '締切済'));
+      b.dataset.ym = m.ym;
+      b.onclick = () => { if (dirty && !confirmLeave()) return; loadMonth(m.ym); };
+      box.appendChild(b);
+    });
+    loadMonth(r.defaultYm);
+  } catch (err) { showError(err); }
+}
+
+let leaveArmed = false;
+function confirmLeave() {
+  if (leaveArmed) { leaveArmed = false; return true; }
+  leaveArmed = true; toast('まだ提出していない変更があります。もう一度押すと、変更を消して切り替えます');
+  setTimeout(() => (leaveArmed = false), 4000);
+  return false;
+}
+
+async function loadMonth(ym) {
+  document.querySelectorAll('#months button').forEach((b) => b.classList.toggle('on', b.dataset.ym === ym));
+  $('main').innerHTML = '<div class="loading">読み込み中…</div>';
+  $('submit').disabled = true;
+  try {
+    state = await call('month', { ym: ym });
+    vals = JSON.parse(JSON.stringify(state.values));
+    note = state.note || '';
+    dirty = false;
+    render();
+  } catch (err) { showError(err); }
+}
+
+const planOf = (d) => state.plan.find((p) => p.d === d);
+const isHol = (d) => !!(state.holidays && state.holidays[String(d)]);
+
+function resetToUsual() {
+  if (!resetToUsual.armed) {
+    resetToUsual.armed = true; toast('もう一度押すと、いつもの予定に戻します（メモも消えます）');
+    setTimeout(() => (resetToUsual.armed = false), 4000);
+    return;
+  }
+  resetToUsual.armed = false;
+  state.plan.forEach((p) => (vals[p.d] = { v: p.def, memo: '' }));
+  dirty = true; renderDays(); toast('いつもの予定に戻しました');
+}
+
+function render() {
+  const main = $('main'); main.innerHTML = '';
+  const locked = state.locked;
+
+  if (locked) main.appendChild(el('div', 'note warn', state.label + '分は締切（' + state.deadline + '）を過ぎました。変更があるときは、お手数ですが施設までお電話ください' + (state.phone ? '（' + state.phone + '）' : '') + '。'));
+  else if (state.submittedAt) main.appendChild(el('div', 'note ok', '提出ありがとうございました（' + state.submittedAt + '）。締切の ' + state.deadline + ' までは何度でも直せます。'));
+  else main.appendChild(el('div', 'note ok', state.label + '分のご予定を、' + state.deadline + ' までにご提出ください。'));
+
+  const info = el('div', 'card');
+  info.appendChild(el('h2', '', 'いつものご利用'));
+  const u = el('div', 'usual');
+  const a = el('span'); a.append('平日：'); a.appendChild(el('b', '', state.weekdays || 'なし')); u.appendChild(a);
+  const b = el('span'); b.appendChild(el('b', '', state.satLabel)); u.appendChild(b);
+  info.appendChild(u);
+  if (!locked) {
+    const how = el('ul', 'how');
+    ['いつもの日には、最初から「利用」が入っています。',
+     'お休みの日は「休み」、いつもは無い日に来たいときは「利用」を押してください。',
+     state.plan.some((p) => p.type === 'hope') ? '土曜日は、利用したい日に「第1希望」「第2希望」…を選んでください。' : null,
+     '時間の変更や通院・ショートステイなどは「メモ」に書いてください。',
+     '変更がなければ、そのまま「提出する」を押してください。']
+      .filter(Boolean).forEach((t) => how.appendChild(el('li', '', t)));
+    info.appendChild(how);
+  }
+  main.appendChild(info);
+
+  if (!locked) {
+    const tools = el('div', 'tools');
+    const rb = el('button', 'btn sub', 'いつもの予定に戻す');
+    rb.onclick = resetToUsual;
+    tools.appendChild(rb);
+    main.appendChild(tools);
+  }
+
+  const list = el('div', 'days'); list.id = 'days';
+  main.appendChild(list);
+
+  const nc = el('div', 'card'); nc.style.marginTop = '12px';
+  nc.appendChild(el('h2', '', 'その他・連絡事項'));
+  const ta = document.createElement('textarea'); ta.maxLength = 300; ta.value = note; ta.disabled = locked;
+  ta.placeholder = '例：12日は通院のため、迎えは自宅ではなく病院にお願いします';
+  ta.oninput = () => { note = ta.value; dirty = true; updateCount(); };
+  nc.appendChild(ta);
+  if (state.phone) nc.appendChild(el('p', 'how', '急な変更は、分かりしだいお電話でご連絡ください（' + state.phone + '）。'));
+  main.appendChild(nc);
+
+  renderDays();
+  $('submit').disabled = locked;
+  $('submit').textContent = state.submittedAt ? '直して提出' : '提出する';
+}
+
+function isChanged(p) {
+  const v = vals[p.d] || {};
+  if (p.type === 'closed' || p.type === 'satNone') return false;
+  return (v.v || '') !== (p.def || '') || !!v.memo;
+}
+
+function renderDays() {
+  const list = $('days'); list.innerHTML = '';
+  const locked = state.locked;
+  state.plan.forEach((p) => {
+    const v = vals[p.d] || { v: '', memo: '' };
+    const hol = isHol(p.d);
+    const row = el('div', 'day w' + (hol ? 0 : p.dow));
+    const dl = el('div', 'dl', p.d + '日 ');
+    dl.appendChild(el('small', '', '(' + DOW[p.dow] + (hol ? '・祝' : '') + ')'));
+    if (p.dow === 6 && p.nth) dl.appendChild(el('span', 'tag', '第' + p.nth + '土曜'));
+    row.appendChild(dl);
+
+    if (p.type === 'closed' || p.type === 'satNone') {
+      row.classList.add('closed');
+      row.appendChild(el('span', 'closed-txt', p.type === 'satNone' ? '土曜はご利用なし' : (p.reason === '日曜' ? 'お休み' : 'お休み（' + p.reason + '）')));
+      row.appendChild(el('span'));
+      list.appendChild(row);
+      return;
+    }
+
+    const mid = el('div');
+    if (p.type === 'hope') {
+      const s = el('select');
+      s.appendChild(new Option('希望しない', ''));
+      for (let n = 1; n <= MAX_HOPE; n++) s.appendChild(new Option('第' + n + '希望', '希望' + n));
+      s.value = v.v || '';
+      s.classList.toggle('has', !!s.value);
+      s.disabled = locked;
+      s.onchange = () => {
+        // 同じ順位がほかの土曜にあれば外す
+        if (s.value) state.plan.forEach((q) => { if (q.d !== p.d && vals[q.d] && vals[q.d].v === s.value) vals[q.d].v = ''; });
+        vals[p.d] = { v: s.value, memo: (vals[p.d] || {}).memo || '' };
+        dirty = true; renderDays();
+      };
+      mid.appendChild(s);
+    } else {
+      const seg = el('span', 'seg');
+      const bu = el('button', p.usual ? 'use' : 'add', '利用');
+      const bo = el('button', 'off', '休み');
+      bu.classList.toggle('on', v.v === '利用');
+      bo.classList.toggle('on', v.v !== '利用');
+      bu.disabled = bo.disabled = locked;
+      const set = (x) => { vals[p.d] = { v: x, memo: (vals[p.d] || {}).memo || '' }; dirty = true; renderDays(); };
+      bu.onclick = () => set('利用');
+      bo.onclick = () => set('休み');
+      seg.append(bu, bo);
+      mid.appendChild(seg);
+    }
+    if (isChanged(p) && (v.v || '') !== (p.def || '')) {
+      const t = p.type === 'hope' ? '' : v.v === '利用' ? '追加' : 'いつもはご利用';
+      if (t) mid.appendChild(el('span', 'chg', t));
+    }
+    row.appendChild(mid);
+    if (isChanged(p)) row.classList.add('changed');
+
+    const mb = el('button', 'memo-btn' + (v.memo ? ' has' : ''), v.memo ? 'メモ✓' : 'メモ');
+    mb.disabled = locked && !v.memo;
+    row.appendChild(mb);
+    const box = el('div', 'memo'); box.hidden = !v.memo;
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 60;
+    inp.placeholder = '例：通院のため11時ごろ通所／ショートステイ明け';
+    inp.value = v.memo || ''; inp.disabled = locked;
+    inp.oninput = () => {
+      vals[p.d] = { v: (vals[p.d] || {}).v || '', memo: inp.value }; dirty = true;
+      mb.classList.toggle('has', !!inp.value); mb.textContent = inp.value ? 'メモ✓' : 'メモ';
+      row.classList.toggle('changed', isChanged(p)); updateCount();
+    };
+    box.appendChild(inp); row.appendChild(box);
+    mb.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) inp.focus(); };
+    list.appendChild(row);
+  });
+  updateCount();
+}
+
+function updateCount() {
+  const use = state.plan.filter((p) => vals[p.d] && vals[p.d].v === '利用').length;
+  const hopes = state.plan.filter((p) => vals[p.d] && /^希望/.test(vals[p.d].v || '')).length;
+  const chg = state.plan.filter(isChanged).length;
+  let t = '利用 ' + use + '日';
+  if (state.plan.some((p) => p.type === 'hope')) t += '・土曜希望 ' + hopes + '日';
+  t += '\n' + (chg ? '変更 ' + chg + 'か所' : 'いつもどおり') + (dirty ? '（未提出）' : '');
+  $('count').textContent = t;
+  $('count').style.whiteSpace = 'pre-line';
+}
+
+$('submit').onclick = async () => {
+  if (!state || state.locked) return;
+  const hopeDays = state.plan.filter((p) => p.type === 'hope');
+  const hopes = hopeDays.filter((p) => vals[p.d] && vals[p.d].v).length;
+  if (state.satTarget && hopes > state.satTarget && !$('submit').dataset.armed) {
+    $('submit').dataset.armed = '1';
+    toast('土曜の希望が ' + hopes + '日あります（目安は月' + state.satTarget + '回）。このまま出すときは、もう一度押してください');
+    setTimeout(() => delete $('submit').dataset.armed, 4000);
+    return;
+  }
+  delete $('submit').dataset.armed;
+  $('submit').disabled = true; $('submit').textContent = '送信中…';
+  try {
+    const r = await call('save', { ym: state.ym, payload: { days: vals, note: note } });
+    state.submittedAt = r.submittedAt; state.note = note; dirty = false;
+    render(); window.scrollTo(0, 0); toast('提出しました。ありがとうございました');
+  } catch (err) {
+    toast(err.message || '送信に失敗しました。電波の良いところでもう一度お試しください');
+    $('submit').disabled = false; $('submit').textContent = state.submittedAt ? '直して提出' : '提出する';
+  }
+};
+
+init();
+</script>
+</body>
+</html>

@@ -392,6 +392,7 @@ function renderDays() {
     };
     box.appendChild(inp); row.appendChild(box);
     mb.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) inp.focus(); };
+    if (v.office) { const of = el('div', 'ride'); of.style.color = '#8a5a00'; of.textContent = '施設で受付：' + v.office.replace(/[📞📒📝]/gu, ''); row.appendChild(of); }
     if (isUseDay(p, v)) addRide(row, p, locked);
     list.appendChild(row);
   });

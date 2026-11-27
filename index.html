@@ -249,7 +249,7 @@ function render() {
     main.appendChild(el('div', 'note warn', state.label + '分のご予定を、' + state.deadline + ' までにご提出ください。'));
   }
   if (!locked && state.editFrom > 1) {
-    main.appendChild(el('div', 'note warn', '今日までの日は、この画面では変更できません。当日の急な変更は、お電話でご連絡ください' + tel + '。'));
+    main.appendChild(el('div', 'note warn', '当日・前日・2日前のご予定は、この画面では変更できません。変更するときは、お電話でご連絡ください' + tel + '。'));
   }
   main.lastChild.style.whiteSpace = 'pre-line';
 
@@ -325,13 +325,14 @@ function isChanged(p) {
 function renderDays() {
   const list = $('days'); list.innerHTML = '';
   state.plan.forEach((p) => {
-    const locked = state.locked || p.d < state.editFrom; // 過ぎた日・今日は変えられない
+    const locked = state.locked || p.d < state.editFrom; // 当日・前日・2日前（と過ぎた日）は変えられない
     const v = vals[p.d] || { v: '', memo: '' };
     const hol = isHol(p.d);
     const row = el('div', 'day w' + (hol ? 0 : p.dow));
     const dl = el('div', 'dl', p.d + '日 ');
     dl.appendChild(el('small', '', '(' + DOW[p.dow] + (hol ? '・祝' : '') + ')'));
     if (p.dow === 6 && p.nth) dl.appendChild(el('span', 'tag', '第' + p.nth + '土曜'));
+    if (!state.locked && p.d < state.editFrom && p.d >= state.editFrom - 3 && p.type !== 'closed') dl.appendChild(el('span', 'tag', '変更はお電話で'));
     row.appendChild(dl);
 
     if (p.type === 'closed' || p.type === 'satNone') {
